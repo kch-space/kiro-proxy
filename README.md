@@ -71,6 +71,11 @@ echo "[]" > data/credentials.json
 docker compose up -d
 ```
 
+> ⚠️ **首次启动说明**：
+> - 首次运行会自动构建 Docker 镜像，需要 **7-15 分钟**（取决于网络速度和 CPU 性能）
+> - 构建过程包括：前端编译（2-4 分钟）+ Rust 编译（5-10 分钟）
+> - 后续启动会直接使用已构建的镜像，只需几秒钟
+
 **5. 访问管理面板**
 
 打开浏览器访问 `http://localhost:5678/admin`，使用 `config.json` 中配置的 `adminApiKey` 登录，然后添加 Kiro 账号。
@@ -91,7 +96,12 @@ docker compose up -d
 | `balanceMode` | string | 否 | `priority` | 负载均衡模式：`priority` 或 `balanced` |
 | `tlsBackend` | string | 否 | `rustls` | TLS 后端：`rustls` 或 `native-tls` |
 
-> ⚠️ **国内用户必读**：必须配置 `proxyUrl`，否则 Claude 模型请求会返回 `INVALID_MODEL_ID` 错误。在 Docker 中使用 `http://host.docker.internal:7890`（7890 改为你的代理端口）。
+> ⚠️ **国内用户必读**：必须配置 `proxyUrl`，否则 Claude 模型请求会返回 `INVALID_MODEL_ID` 错误。
+>
+> **在 Docker 中使用代理的说明**：
+> - `host.docker.internal` 是 Docker 提供的特殊域名，指向宿主机（你的电脑）
+> - 容器内的 `127.0.0.1` 只能访问容器自己，无法访问宿主机的代理软件
+> - 配置示例：`"proxyUrl": "http://host.docker.internal:7890"`（7890 改为你的代理端口）
 
 ### credentials.json 配置项
 
@@ -178,9 +188,24 @@ docker compose restart
 
 ```bash
 git pull
-docker compose pull
-docker compose down && docker compose up -d
+docker compose down
+docker compose up -d --build
 ```
+
+> 💡 **关于重新构建**：
+> - 默认配置下，`docker compose up -d` 每次都会检查代码变化并重新构建（耗时 7-15 分钟）
+> - 如果代码未修改，不想重新构建，可以修改 `docker-compose.yml`：
+>
+> ```yaml
+> services:
+>   kiro2cc-proxy:
+>     # build: .  # 注释掉这一行
+>     image: kiro2cc-proxy:latest
+>     # ... 其他配置保持不变
+> ```
+>
+> - 修改后，启动时会直接使用已构建的镜像，启动速度只需几秒钟
+> - 如需更新代码并重新构建，运行 `docker compose up -d --build`
 
 ### 停止服务
 
@@ -217,9 +242,15 @@ extra_hosts:
   - "host.docker.internal:host-gateway"
 ```
 
+这个配置让容器能访问宿主机上的服务（如代理软件）。如果没有这行，容器内的 `host.docker.internal` 无法解析。
+
 **Q：企业版 IdC 账号请求返回 502**
 
 在管理面板「添加账号 / 编辑账号」中填写 **Profile ARN**，格式如：`arn:aws:codewhisperer:<region>:<account-id>:profile/<profile-id>`
+
+**Q：首次启动很慢，一直在构建**
+
+这是正常的。首次构建需要下载依赖并编译前端和 Rust 代码，需要 7-15 分钟。后续启动会直接使用已构建的镜像，只需几秒钟。
 
 ---
 

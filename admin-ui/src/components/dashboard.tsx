@@ -672,7 +672,7 @@ export function Dashboard({ onLogout }: DashboardProps) {
         <div className="px-[22px] py-5 flex items-center gap-2.5 border-b border-border">
           <img src={kiroIcon} alt="Kiro" className="h-8 w-8 rounded-lg" />
           <div>
-            <div className="text-[15px] font-semibold tracking-[-0.01em]">Kiro2CCProxy</div>
+            <div className="text-[15px] font-semibold tracking-[-0.01em]">Kiro-Proxy</div>
             <div className="text-[11px] text-muted-foreground mt-0.5">Admin 控制台</div>
           </div>
         </div>

@@ -71,10 +71,9 @@ echo "[]" > data/credentials.json
 docker compose up -d
 ```
 
-> ⚠️ **首次启动说明**：
-> - 首次运行会自动构建 Docker 镜像，需要 **7-15 分钟**（取决于网络速度和 CPU 性能）
-> - 构建过程包括：前端编译（2-4 分钟）+ Rust 编译（5-10 分钟）
-> - 后续启动会直接使用已构建的镜像，只需几秒钟
+> 💡 **首次启动说明**：
+> - 首次运行会自动拉取 Docker 镜像（约 10MB），需要 **10-60 秒**（取决于网络速度）
+> - 后续启动会直接使用已缓存的镜像，只需几秒钟
 
 **5. 访问管理面板**
 
@@ -186,31 +185,64 @@ docker compose restart
 
 ### 更新服务
 
+拉取最新代码和镜像：
+
 ```bash
 git pull
-docker compose down
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 ```
-
-> 💡 **关于重新构建**：
-> - 默认配置下，`docker compose up -d` 每次都会检查代码变化并重新构建（耗时 7-15 分钟）
-> - 如果代码未修改，不想重新构建，可以修改 `docker-compose.yml`：
->
-> ```yaml
-> services:
->   kiro2cc-proxy:
->     # build: .  # 注释掉这一行
->     image: kiro2cc-proxy:latest
->     # ... 其他配置保持不变
-> ```
->
-> - 修改后，启动时会直接使用已构建的镜像，启动速度只需几秒钟
-> - 如需更新代码并重新构建，运行 `docker compose up -d --build`
 
 ### 停止服务
 
 ```bash
 docker compose down
+```
+
+---
+
+## 自定义构建
+
+如果你需要修改代码并自行构建镜像，请按以下步骤操作：
+
+### 构建步骤
+
+**1. 修改 docker-compose.yml**
+
+在 `docker-compose.yml` 中添加 `build` 配置：
+
+```yaml
+services:
+  kiro2cc-proxy:
+    build: .
+    image: kiro2cc-proxy:latest
+    container_name: kiro2cc-proxy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "0.0.0.0:5678:5678"
+    volumes:
+      - ./data:/app/config
+    restart: unless-stopped
+```
+
+**2. 构建并启动**
+
+```bash
+docker compose up -d --build
+```
+
+> ⚠️ **构建时间说明**：
+> - 首次构建需要 **7-15 分钟**（取决于网络速度和 CPU 性能）
+> - 构建过程包括：前端编译（2-4 分钟）+ Rust 编译（5-10 分钟）
+> - 后续启动会直接使用已构建的镜像，只需几秒钟
+
+**3. 更新自定义构建**
+
+修改代码后重新构建：
+
+```bash
+docker compose up -d --build
 ```
 
 ---
@@ -248,9 +280,11 @@ extra_hosts:
 
 在管理面板「添加账号 / 编辑账号」中填写 **Profile ARN**，格式如：`arn:aws:codewhisperer:<region>:<account-id>:profile/<profile-id>`
 
-**Q：首次启动很慢，一直在构建**
+**Q：拉取 Docker 镜像失败**
 
-这是正常的。首次构建需要下载依赖并编译前端和 Rust 代码，需要 7-15 分钟。后续启动会直接使用已构建的镜像，只需几秒钟。
+如果从 Docker Hub 拉取镜像失败，可以尝试：
+1. 配置 Docker 镜像加速器
+2. 或使用自定义构建方式（参见"自定义构建"章节）
 
 ---
 

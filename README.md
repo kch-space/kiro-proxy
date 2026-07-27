@@ -48,13 +48,12 @@ mkdir -p data
 ```bash
 cat > data/config.json << 'EOL'
 {
-  "apiKey": "sk-kiro2cc-proxy-qazWSXedcRFV123456",
   "host": "0.0.0.0",
   "port": 5678,
-  "adminApiKey": "sk-admin-your-secret-key",
-  "proxyUrl": "",
-  "balanceMode": "priority",
-  "tlsBackend": "rustls"
+  "apiKey": "sk-kiro2cc-proxy-qazWSXedcRFV123456",
+  "tlsBackend": "rustls",
+  "region": "us-east-1",
+  "adminApiKey": "sk-admin-your-secret-key"
 }
 EOL
 ```

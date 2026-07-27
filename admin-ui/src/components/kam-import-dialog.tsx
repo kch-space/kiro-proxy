@@ -67,10 +67,10 @@ function normalizeToKamAccount(item: unknown): unknown {
   if (typeof obj.credentials === 'object' && obj.credentials !== null) return item
   // 顶层有 refreshToken，自动包装
   if (typeof obj.refreshToken === 'string' && obj.refreshToken.trim().length > 0) {
-    const { refreshToken, clientId, clientSecret, region, authMethod, startUrl, ...rest } = obj
+    const { refreshToken, clientId, clientSecret, region, authMethod, startUrl, profileArn, ...rest } = obj
     return {
       ...rest,
-      credentials: { refreshToken, clientId, clientSecret, region, authMethod, startUrl },
+      credentials: { refreshToken, clientId, clientSecret, region, authMethod, startUrl, profileArn },
     }
   }
   return item

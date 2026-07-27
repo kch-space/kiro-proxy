@@ -89,7 +89,32 @@ export function BatchImportDialog({ open, onOpenChange }: BatchImportDialogProps
       const parsed = JSON.parse(jsonInput)
       let credentials: CredentialInput[]
       if (Array.isArray(parsed)) {
-        credentials = parsed
+        credentials = parsed.map((a: Record<string, any>) => {
+          if (a.credentials && typeof a.credentials === "object") {
+            return {
+              refreshToken: a.credentials.refreshToken || a.refreshToken,
+              email: a.email || a.nickname,
+              machineId: a.machineId,
+              authRegion: a.credentials.region || a.authRegion || a.region,
+              apiRegion: a.apiRegion,
+              authMethod: a.credentials.authMethod || a.authMethod,
+              clientId: a.credentials.clientId || a.clientId || undefined,
+              clientSecret: a.credentials.clientSecret || a.clientSecret || undefined,
+              profileArn: a.profileArn || a.credentials.profileArn || undefined,
+            }
+          }
+          return {
+            refreshToken: a.refreshToken,
+            email: a.email || a.nickname,
+            machineId: a.machineId,
+            authRegion: a.authRegion || a.region,
+            apiRegion: a.apiRegion,
+            authMethod: a.authMethod,
+            clientId: a.clientId || undefined,
+            clientSecret: a.clientSecret || undefined,
+            profileArn: a.profileArn || undefined,
+          }
+        }).filter((c: CredentialInput) => c.refreshToken)
       } else if (parsed.accounts && Array.isArray(parsed.accounts)) {
         // KAM 导出格式：{ version, accounts: [...] }
         credentials = parsed.accounts

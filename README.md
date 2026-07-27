@@ -48,10 +48,10 @@ mkdir -p data
 ```bash
 cat > data/config.json << 'EOL'
 {
-  "apiKey": "your-api-key-here",
+  "apiKey": "sk-kiro2cc-proxy-qazWSXedcRFV123456",
   "host": "0.0.0.0",
   "port": 5678,
-  "adminApiKey": "your-admin-key-here",
+  "adminApiKey": "sk-admin-your-secret-key",
   "proxyUrl": "",
   "balanceMode": "priority",
   "tlsBackend": "rustls"
@@ -185,12 +185,22 @@ docker compose restart
 
 ### 更新服务
 
+**使用官方镜像（推荐）**
+
 拉取最新代码和镜像：
 
 ```bash
 git pull
 docker compose pull
 docker compose up -d
+```
+
+**使用自定义构建**
+
+如果你修改了代码，需要重新构建镜像（参见"自定义构建"章节）：
+
+```bash
+docker compose up -d --build
 ```
 
 ### 停止服务
@@ -244,6 +254,29 @@ docker compose up -d --build
 ```bash
 docker compose up -d --build
 ```
+
+**4. 发布自定义镜像到 Docker Hub（可选）**
+
+如果你想发布自己的镜像到 Docker Hub：
+
+```bash
+# 构建镜像
+docker compose build
+
+# 登录 Docker Hub
+docker login
+
+# 标记镜像（替换为你的 Docker Hub 用户名）
+docker tag kiro2cc-proxy:latest your-dockerhub-username/kiro-proxy:latest
+
+# 推送镜像
+docker push your-dockerhub-username/kiro-proxy:latest
+
+# 更新 docker-compose.yml 中的镜像名称
+# image: your-dockerhub-username/kiro-proxy:latest
+```
+
+之后可以在其他机器上直接使用你发布的镜像。
 
 ---
 

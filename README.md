@@ -335,4 +335,4 @@ MIT
 
 ## 致谢
 
-本项目基于 [kiro.rs](https://github.com/hank9999/kiro.rs) 二次开发，感谢原作者的开源贡献。
+本项目基于 [TsinHzl/kiro2cc-proxy](https://github.com/TsinHzl/kiro2cc-proxy) 二次开发，感谢原作者的开源贡献。

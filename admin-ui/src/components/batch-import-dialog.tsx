@@ -23,6 +23,7 @@ interface BatchImportDialogProps {
 interface CredentialInput {
   refreshToken: string
   email?: string
+  nickname?: string
   clientId?: string
   clientSecret?: string
   profileArn?: string
@@ -31,6 +32,9 @@ interface CredentialInput {
   apiRegion?: string
   priority?: number
   machineId?: string
+  proxyUrl?: string
+  proxyUsername?: string
+  proxyPassword?: string
 }
 
 interface VerificationResult {
@@ -94,6 +98,7 @@ export function BatchImportDialog({ open, onOpenChange }: BatchImportDialogProps
             return {
               refreshToken: a.credentials.refreshToken || a.refreshToken,
               email: a.email || a.nickname,
+              nickname: a.nickname,
               machineId: a.machineId,
               authRegion: a.credentials.region || a.authRegion || a.region,
               apiRegion: a.apiRegion,
@@ -101,11 +106,16 @@ export function BatchImportDialog({ open, onOpenChange }: BatchImportDialogProps
               clientId: a.credentials.clientId || a.clientId || undefined,
               clientSecret: a.credentials.clientSecret || a.clientSecret || undefined,
               profileArn: a.profileArn || a.credentials.profileArn || undefined,
+              priority: a.priority,
+              proxyUrl: a.proxyUrl,
+              proxyUsername: a.proxyUsername,
+              proxyPassword: a.proxyPassword,
             }
           }
           return {
             refreshToken: a.refreshToken,
             email: a.email || a.nickname,
+            nickname: a.nickname,
             machineId: a.machineId,
             authRegion: a.authRegion || a.region,
             apiRegion: a.apiRegion,
@@ -113,20 +123,31 @@ export function BatchImportDialog({ open, onOpenChange }: BatchImportDialogProps
             clientId: a.clientId || undefined,
             clientSecret: a.clientSecret || undefined,
             profileArn: a.profileArn || undefined,
+            priority: a.priority,
+            proxyUrl: a.proxyUrl,
+            proxyUsername: a.proxyUsername,
+            proxyPassword: a.proxyPassword,
           }
         }).filter((c: CredentialInput) => c.refreshToken)
       } else if (parsed.accounts && Array.isArray(parsed.accounts)) {
         // KAM 导出格式：{ version, accounts: [...] }
+        // apiRegion / priority / proxy* 是本项目导出时附加的扩展字段，位于账号层级
         credentials = parsed.accounts
           .map((a: Record<string, any>) => ({
             refreshToken: a.credentials?.refreshToken,
             email: a.email || a.nickname,
+            nickname: a.nickname,
             machineId: a.machineId,
             authRegion: a.credentials?.region,
+            apiRegion: a.apiRegion,
             authMethod: a.credentials?.authMethod,
             clientId: a.credentials?.clientId || undefined,
             clientSecret: a.credentials?.clientSecret || undefined,
             profileArn: a.profileArn || a.credentials?.profileArn || undefined,
+            priority: a.priority,
+            proxyUrl: a.proxyUrl,
+            proxyUsername: a.proxyUsername,
+            proxyPassword: a.proxyPassword,
           }))
           .filter((c: CredentialInput) => c.refreshToken)
       } else {
@@ -218,6 +239,7 @@ export function BatchImportDialog({ open, onOpenChange }: BatchImportDialogProps
             refreshToken: token,
             authMethod,
             email: cred.email?.trim() || undefined,
+            nickname: cred.nickname?.trim() || undefined,
             authRegion: cred.authRegion?.trim() || cred.region?.trim() || undefined,
             apiRegion: cred.apiRegion?.trim() || undefined,
             clientId,
@@ -225,6 +247,9 @@ export function BatchImportDialog({ open, onOpenChange }: BatchImportDialogProps
             profileArn: cred.profileArn?.trim() || undefined,
             priority: cred.priority || 0,
             machineId: cred.machineId?.trim() || undefined,
+            proxyUrl: cred.proxyUrl?.trim() || undefined,
+            proxyUsername: cred.proxyUsername?.trim() || undefined,
+            proxyPassword: cred.proxyPassword?.trim() || undefined,
           })
 
           addedCredId = addedCred.credentialId

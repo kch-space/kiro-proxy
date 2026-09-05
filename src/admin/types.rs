@@ -420,3 +420,77 @@ pub struct AdminModelsResponse {
     pub object: String,
     pub data: Vec<AdminModelItem>,
 }
+
+// ============ 账号导出 ============
+
+/// 导出账号请求 Query 参数
+#[derive(Debug, Deserialize)]
+pub struct ExportCredentialsQuery {
+    /// 逗号分隔的账号 ID，缺省导出全部
+    #[serde(default)]
+    pub ids: Option<String>,
+}
+
+/// 账号导出文件（KAM 兼容格式的超集）
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportCredentialsResponse {
+    /// 导出格式版本
+    pub version: String,
+    /// 导出时间（RFC3339 格式）
+    pub exported_at: String,
+    /// 账号列表
+    pub accounts: Vec<ExportAccount>,
+}
+
+/// 导出的单个账号
+///
+/// `credentials` 之外的字段中，`apiRegion` / `priority` / `proxy*` / `disabled`
+/// 是本项目对 KAM 格式的扩展；KAM 等外部工具会忽略未知字段。
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportAccount {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub email: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nickname: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub profile_arn: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub machine_id: Option<String>,
+    /// KAM 嵌套凭证结构
+    pub credentials: ExportAccountCredentials,
+    /// 账号级 API Region（KAM 扩展）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub api_region: Option<String>,
+    /// 优先级（KAM 扩展，始终输出以保证目标端字段稳定）
+    pub priority: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub proxy_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub proxy_username: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub proxy_password: Option<String>,
+    /// 禁用状态（KAM 扩展，仅作记录，导入侧不会恢复）
+    pub disabled: bool,
+}
+
+/// 导出账号的 KAM 嵌套凭证结构
+///
+/// 不含 `accessToken` / `expiresAt`：短期凭证，目标服务器会用 refreshToken 重新获取。
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportAccountCredentials {
+    pub refresh_token: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub client_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub client_secret: Option<String>,
+    /// 对应本项目的 auth_region（与导入侧字段映射保持对称）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub region: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub auth_method: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub profile_arn: Option<String>,
+}

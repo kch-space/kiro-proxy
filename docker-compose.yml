@@ -1,6 +1,7 @@
 services:
   kiro2cc-proxy:
-    image: kch9231/kiro-proxy:latest
+    build: .
+    image: kiro-proxy:latest
     container_name: kiro2cc-proxy
     extra_hosts:
       - "host.docker.internal:host-gateway"

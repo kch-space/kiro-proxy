@@ -1,6 +1,6 @@
 // Copyright (c) 2026 Harllan He. Licensed under MIT.
 import { useState, useEffect, useRef } from 'react'
-import { RefreshCw, LogOut, Server, Plus, Upload, FileUp, Trash2, RotateCcw, CheckCircle2, Key, Settings, BarChart2, ScrollText, Boxes } from 'lucide-react'
+import { RefreshCw, LogOut, Server, Plus, Upload, Download, FileUp, Trash2, RotateCcw, CheckCircle2, Key, Settings, BarChart2, ScrollText, Boxes } from 'lucide-react'
 import kiroIcon from '@/assets/kiro-icon.png'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -25,7 +25,7 @@ import { useCredentials, useDeleteCredential, useResetFailure, useRpm, useDailyU
 import { DailyStatsPage } from '@/components/daily-stats-page'
 import { ModelListPage } from '@/components/model-list-page'
 import { DailyDetailPage } from '@/components/daily-detail-page'
-import { getCredentialBalance } from '@/api/credentials'
+import { getCredentialBalance, exportCredentials } from '@/api/credentials'
 import { extractErrorMessage } from '@/lib/utils'
 import type { BalanceResponse, ApiKeyItem } from '@/types/api'
 
@@ -44,6 +44,7 @@ export function Dashboard({ onLogout }: DashboardProps) {
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [batchImportDialogOpen, setBatchImportDialogOpen] = useState(false)
   const [kamImportDialogOpen, setKamImportDialogOpen] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [verifyDialogOpen, setVerifyDialogOpen] = useState(false)
   const [verifying, setVerifying] = useState(false)
@@ -470,6 +471,40 @@ export function Dashboard({ onLogout }: DashboardProps) {
     }
 
     deselectAll()
+  }
+
+  // 导出账号为 KAM 兼容 JSON 文件（有勾选则只导出勾选的）
+  const handleExport = async () => {
+    const ids = selectedIds.size > 0 ? Array.from(selectedIds) : undefined
+    setExporting(true)
+    try {
+      const payload = await exportCredentials(ids)
+
+      if (payload.accounts.length === 0) {
+        toast.error('没有可导出的账号')
+        return
+      }
+
+      const now = new Date()
+      const pad = (n: number) => String(n).padStart(2, '0')
+      const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`
+
+      const blob = new Blob([JSON.stringify(payload, null, 2)], {
+        type: 'application/json',
+      })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `kiro-accounts-${stamp}.json`
+      link.click()
+      URL.revokeObjectURL(url)
+
+      toast.success(`已导出 ${payload.accounts.length} 个账号`)
+    } catch (error) {
+      toast.error('导出失败: ' + extractErrorMessage(error))
+    } finally {
+      setExporting(false)
+    }
   }
 
   // 查询所有凭据信息（逐个查询，避免瞬时并发）
@@ -926,6 +961,22 @@ export function Dashboard({ onLogout }: DashboardProps) {
               <Button onClick={() => setBatchImportDialogOpen(true)} size="sm" variant="outline">
                 <Upload className="h-4 w-4 sm:mr-2" />
                 <span className="hidden sm:inline">批量导入</span>
+              </Button>
+              <Button
+                onClick={handleExport}
+                size="sm"
+                variant="outline"
+                disabled={exporting || !data?.credentials?.length}
+                title={!data?.credentials?.length ? '暂无可导出的账号' : undefined}
+              >
+                <Download className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">
+                  {exporting
+                    ? '导出中...'
+                    : selectedIds.size > 0
+                      ? `导出选中 (${selectedIds.size})`
+                      : '导出账号'}
+                </span>
               </Button>
               <Button onClick={() => setAddDialogOpen(true)} size="sm">
                 <Plus className="h-4 w-4 sm:mr-2" />

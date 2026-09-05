@@ -80,6 +80,39 @@ export interface AddCredentialRequest {
   proxyPassword?: string
 }
 
+// 导出账号的 KAM 嵌套凭证结构
+export interface ExportedAccountCredentials {
+  refreshToken: string
+  clientId?: string
+  clientSecret?: string
+  /** 对应后端的 authRegion */
+  region?: string
+  authMethod?: string
+  profileArn?: string
+}
+
+// 导出的单个账号（KAM 结构 + 本项目扩展字段）
+export interface ExportedAccount {
+  email?: string
+  nickname?: string
+  profileArn?: string
+  machineId?: string
+  credentials: ExportedAccountCredentials
+  apiRegion?: string
+  priority: number
+  proxyUrl?: string
+  proxyUsername?: string
+  proxyPassword?: string
+  disabled: boolean
+}
+
+// 账号导出响应
+export interface ExportCredentialsResponse {
+  version: string
+  exportedAt: string
+  accounts: ExportedAccount[]
+}
+
 // 更新凭据请求
 export interface UpdateCredentialRequest {
   refreshToken?: string

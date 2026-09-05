@@ -37,6 +37,12 @@ interface KamAccount {
   }
   machineId?: string
   status?: string
+  // 以下为本项目导出时附加的扩展字段（标准 KAM 格式不含）
+  apiRegion?: string
+  priority?: number
+  proxyUrl?: string
+  proxyUsername?: string
+  proxyPassword?: string
 }
 
 interface VerificationResult {
@@ -251,11 +257,17 @@ export function KamImportDialog({ open, onOpenChange }: KamImportDialogProps) {
             refreshToken: token,
             authMethod,
             email: account.email || account.nickname || undefined,
+            nickname: account.nickname || undefined,
             authRegion: cred.region?.trim() || undefined,
+            apiRegion: account.apiRegion?.trim() || undefined,
             clientId,
             clientSecret,
             profileArn,
+            priority: account.priority || 0,
             machineId: account.machineId?.trim() || undefined,
+            proxyUrl: account.proxyUrl?.trim() || undefined,
+            proxyUsername: account.proxyUsername?.trim() || undefined,
+            proxyPassword: account.proxyPassword?.trim() || undefined,
           })
 
           addedCredId = addedCred.credentialId

@@ -3,15 +3,15 @@
 
 use axum::{
     Json,
-    extract::{Path, State},
+    extract::{Path, Query, State},
     response::IntoResponse,
 };
 
 use super::{
     middleware::AdminState,
     types::{
-        AddCredentialRequest, SetDisabledRequest, SetLoadBalancingModeRequest, SetPriorityRequest,
-        SuccessResponse, UpdateCredentialRequest,
+        AddCredentialRequest, ExportCredentialsQuery, SetDisabledRequest,
+        SetLoadBalancingModeRequest, SetPriorityRequest, SuccessResponse, UpdateCredentialRequest,
     },
 };
 
@@ -19,6 +19,26 @@ use super::{
 /// 获取所有账号状态
 pub async fn get_all_credentials(State(state): State<AdminState>) -> impl IntoResponse {
     let response = state.service.get_all_credentials();
+    Json(response)
+}
+
+/// GET /api/admin/credentials/export?ids=1,2,3
+/// 导出账号凭证（KAM 兼容格式，含明文 refreshToken）
+pub async fn export_credentials(
+    State(state): State<AdminState>,
+    Query(query): Query<ExportCredentialsQuery>,
+) -> impl IntoResponse {
+    let ids = query.ids.as_deref().map(|raw| {
+        raw.split(',')
+            .filter_map(|part| part.trim().parse::<u64>().ok())
+            .collect::<std::collections::HashSet<u64>>()
+    });
+
+    let response = state.service.export_credentials(ids.as_ref());
+    tracing::warn!(
+        "Admin 导出 {} 个账号凭证（含明文 refreshToken）",
+        response.accounts.len()
+    );
     Json(response)
 }
 

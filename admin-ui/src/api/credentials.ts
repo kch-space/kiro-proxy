@@ -10,6 +10,7 @@ import type {
   AddCredentialRequest,
   AddCredentialResponse,
   UpdateCredentialRequest,
+  ExportCredentialsResponse,
   ApiKeyItem,
   CreateApiKeyRequest,
   UpdateApiKeyRequest,
@@ -89,6 +90,17 @@ export async function addCredential(
   req: AddCredentialRequest
 ): Promise<AddCredentialResponse> {
   const { data } = await api.post<AddCredentialResponse>('/credentials', req)
+  return data
+}
+
+// 导出凭据（含明文 refreshToken）；ids 为空时导出全部
+export async function exportCredentials(
+  ids?: number[]
+): Promise<ExportCredentialsResponse> {
+  const { data } = await api.get<ExportCredentialsResponse>(
+    '/credentials/export',
+    { params: ids?.length ? { ids: ids.join(',') } : undefined }
+  )
   return data
 }
 

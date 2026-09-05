@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Harllan He. Licensed under MIT.
 //! Admin API 业务逻辑服务
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -15,8 +15,8 @@ use crate::kiro::token_manager::MultiTokenManager;
 use super::error::AdminServiceError;
 use super::types::{
     AddCredentialRequest, AddCredentialResponse, BalanceResponse, CredentialStatusItem,
-    CredentialsStatusResponse, LoadBalancingModeResponse, SetLoadBalancingModeRequest,
-    UpdateCredentialRequest,
+    CredentialsStatusResponse, ExportAccount, ExportAccountCredentials, ExportCredentialsResponse,
+    LoadBalancingModeResponse, SetLoadBalancingModeRequest, UpdateCredentialRequest,
 };
 
 /// 余额缓存过期时间（秒），5 分钟
@@ -147,6 +147,47 @@ impl AdminService {
             available: snapshot.available,
             current_id: snapshot.current_id,
             credentials,
+        }
+    }
+
+    /// 导出账号凭证为 KAM 兼容结构（含明文 refreshToken）
+    ///
+    /// `ids` 为 None 时导出全部账号。
+    pub fn export_credentials(&self, ids: Option<&HashSet<u64>>) -> ExportCredentialsResponse {
+        let accounts = self
+            .token_manager
+            .export_credentials(ids)
+            .into_iter()
+            .filter_map(|c| {
+                let refresh_token = c.refresh_token?;
+                Some(ExportAccount {
+                    email: c.email,
+                    nickname: c.nickname,
+                    profile_arn: c.profile_arn.clone(),
+                    machine_id: c.machine_id,
+                    credentials: ExportAccountCredentials {
+                        refresh_token,
+                        client_id: c.client_id,
+                        client_secret: c.client_secret,
+                        // 与导入侧 `authRegion || region` 的映射保持对称
+                        region: c.auth_region.or(c.region),
+                        auth_method: c.auth_method,
+                        profile_arn: c.profile_arn,
+                    },
+                    api_region: c.api_region,
+                    priority: c.priority,
+                    proxy_url: c.proxy_url,
+                    proxy_username: c.proxy_username,
+                    proxy_password: c.proxy_password,
+                    disabled: c.disabled,
+                })
+            })
+            .collect();
+
+        ExportCredentialsResponse {
+            version: "1.0".to_string(),
+            exported_at: Utc::now().to_rfc3339(),
+            accounts,
         }
     }
 

@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tokio::sync::Mutex as TokioMutex;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{Duration as StdDuration, Instant};
@@ -1819,6 +1819,24 @@ impl MultiTokenManager {
             total: entries.len(),
             available,
         }
+    }
+
+    /// 导出账号完整凭证（含明文 refreshToken，仅供 Admin 导出接口使用）
+    ///
+    /// `ids` 为 None 时导出全部，否则只导出命中的账号。
+    pub fn export_credentials(&self, ids: Option<&HashSet<u64>>) -> Vec<KiroCredentials> {
+        let entries = self.entries.lock();
+        entries
+            .iter()
+            .filter(|e| ids.is_none_or(|set| set.contains(&e.id)))
+            .map(|e| {
+                let mut credentials = e.credentials.clone();
+                credentials.id = Some(e.id);
+                // entry.disabled 才是禁用状态的权威来源
+                credentials.disabled = e.disabled;
+                credentials
+            })
+            .collect()
     }
 
     /// 设置账号禁用状态（Admin API）

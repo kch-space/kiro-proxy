@@ -25,15 +25,23 @@ Anthropic Claude API 兼容代理服务，将 Claude API 请求转发到 Kiro。
 ### 前置要求
 
 - 安装 Docker 和 Docker Compose
-- 安装 Git（用于获取源码）
 - 一个或多个 Kiro 账号的 `refreshToken`
 
-镜像由本仓库源码构建，构建机器建议满足：
+### 选择部署方式
 
-- **内存 ≥ 2GB**（Rust 编译较吃内存，1GB 的小规格服务器可能被 OOM Kill）
-- **可用磁盘 ≥ 10GB**（含构建缓存）
+本项目支持两种部署方式，配置文件和使用方式完全一致，区别只在镜像从哪来：
 
-> 💡 服务器配置不够时，可以在本机构建好镜像再传到服务器，见「构建说明 → 低配服务器：本地构建后传输」。
+| | 方式 A：拉取预构建镜像 | 方式 B：从源码构建 |
+|---|---|---|
+| 耗时 | 10-60 秒 | 7-15 分钟 |
+| 额外要求 | 无 | Git、内存 ≥ 2GB、可用磁盘 ≥ 10GB |
+| 能否用自己改的代码 | 不能 | 能 |
+| 架构适配 | 由镜像仓库自动匹配 | 构建机即运行机，天然一致 |
+| 适合 | 开箱即用、快速上线 | 改过代码、或想自己掌控构建产物 |
+
+> 💡 拿不定就先用**方式 A**，之后想改代码再切到方式 B，两者可以随时互换，数据不受影响。
+>
+> ⚠️ **注意**：方式 B 的构建对内存要求较高，Rust 编译阶段在 1GB 内存的小规格服务器上可能被 OOM Kill。这种情况可以在本机构建好镜像再传到服务器，见「构建说明 → 低配服务器：本地构建后传输」。
 
 ### 部署步骤
 
@@ -73,18 +81,33 @@ EOL
 echo "[]" > data/credentials.json
 ```
 
-**4. 构建并启动服务**
+**4. 启动服务**
+
+按前面选定的方式二选一执行。
+
+**方式 A：拉取预构建镜像**
 
 ```bash
 docker compose up -d
 ```
 
-`docker-compose.yml` 已配置 `build: .`，首次启动会自动从源码构建镜像。
+> 首次运行会自动拉取镜像（约 37MB），需要 10-60 秒；后续启动直接使用本地缓存，只需几秒钟。
 
-> 💡 **首次启动说明**：
-> - 首次构建需要 **7-15 分钟**（取决于网络速度和 CPU 性能），过程包括前端编译（2-4 分钟）+ Rust 编译（5-10 分钟）
-> - 构建完成后镜像会缓存为 `kiro-proxy:latest`，后续 `docker compose up -d` 直接复用，只需几秒钟
-> - 修改代码后需要显式加 `--build` 才会重新构建，见「更新服务」章节
+**方式 B：从源码构建**
+
+叠加 `docker-compose.build.yml`，把镜像来源换成本地源码：
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+```
+
+> 💡 嫌命令太长，可以在项目根目录创建 `.env` 写入一行，之后直接用 `docker compose up -d --build` 即可：
+>
+> ```bash
+> echo "COMPOSE_FILE=docker-compose.yml:docker-compose.build.yml" > .env
+> ```
+>
+> 首次构建需要 7-15 分钟（前端编译 2-4 分钟 + Rust 编译 5-10 分钟），产物会缓存为本地镜像 `kiro-proxy:latest`。后续启动直接复用，只有显式加 `--build` 才会重新构建。
 
 **5. 访问管理面板**
 
@@ -222,19 +245,34 @@ cp -r data "data.bak.$(date +%Y%m%d-%H%M%S)"
 
 也可以先打开管理面板，用「导出账号」按钮把账号导出成 JSON 留存一份（见「导出账号 / 迁移到其他服务器」）。
 
-建议同时给当前镜像打一个备份 tag，方便回滚：
+建议同时给当前镜像打一个备份 tag，方便回滚（镜像名按你的部署方式选）：
 
 ```bash
+# 方式 A
+docker tag kch9231/kiro-proxy:latest "kch9231/kiro-proxy:backup-$(date +%Y%m%d)"
+
+# 方式 B
 docker tag kiro-proxy:latest "kiro-proxy:backup-$(date +%Y%m%d)"
 ```
 
-#### 拉取新代码并重新构建
+#### 方式 A：拉取新镜像
+
+```bash
+cd /path/to/kiro-proxy
+git pull                 # 同步 docker-compose.yml 等配置的变更
+docker compose pull      # 拉取最新镜像
+docker compose up -d     # 用新镜像重建容器
+```
+
+#### 方式 B：拉取新代码并重新构建
 
 ```bash
 cd /path/to/kiro-proxy
 git pull
-docker compose up -d --build
+docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
 ```
+
+（若已在 `.env` 中配置 `COMPOSE_FILE`，直接 `docker compose up -d --build` 即可。）
 
 要点：
 
@@ -243,6 +281,8 @@ docker compose up -d --build
 - 服务器配置不足时改用本地构建再传输，见「构建说明 → 低配服务器：本地构建后传输」
 
 #### 更新后验证
+
+两种方式通用：
 
 ```bash
 docker compose ps                                          # 容器状态应为 running
@@ -257,11 +297,16 @@ docker compose logs --tail=30                              # 检查启动日志�
 前提是升级前打过备份 tag（见上文）。把备份 tag 重新指回 `latest`，然后重建容器：
 
 ```bash
+# 方式 A
+docker tag kch9231/kiro-proxy:backup-20260905 kch9231/kiro-proxy:latest
+docker compose up -d
+
+# 方式 B（注意不要加 --build，否则会又从源码构建一遍）
 docker tag kiro-proxy:backup-20260905 kiro-proxy:latest
-docker compose up -d          # 注意不要加 --build，否则会又从源码构建一遍
+docker compose up -d
 ```
 
-代码层面的回滚用 `git` 处理，例如 `git checkout <上一个可用的 commit>` 后再 `docker compose up -d --build`。
+方式 B 若要回滚到某个历史版本的代码，用 `git checkout <可用的 commit>` 后重新构建。
 
 #### 清理旧镜像和构建缓存
 
@@ -286,7 +331,11 @@ docker compose down
 
 ## 构建说明
 
-镜像由本仓库源码构建，`docker-compose.yml` 中已配置 `build: .`，正常部署和更新流程见「快速开始」和「更新服务」章节。本章节说明几种特殊场景。
+本章节针对**方式 B（从源码构建）**，说明构建原理和几种特殊场景。常规部署和更新流程见「快速开始」和「更新服务」章节。
+
+源码构建由 `docker-compose.build.yml` 提供，它只覆盖两个字段——加上 `build: .`、把镜像 tag 换成本地的 `kiro-proxy:latest`，其余配置全部沿用 `docker-compose.yml`。
+
+> 💡 **在部署机上构建的好处**：构建机与运行机是同一台，CPU 架构天然一致。相对地，如果在 Apple Silicon 的 Mac（arm64）上构建镜像再传到 x86_64 服务器，容器会因架构不符直接报 `exec format error` 无法启动，必须显式交叉构建才行（见下文「注意 CPU 架构」）。
 
 ### 构建过程
 
@@ -308,13 +357,26 @@ docker build -t kiro-proxy:latest .
 docker save kiro-proxy:latest | gzip > kiro-proxy.tar.gz
 scp kiro-proxy.tar.gz user@server:/tmp/
 
-# 服务器：导入镜像并重建容器（不要加 --build）
+# 服务器：导入镜像
 gunzip -c /tmp/kiro-proxy.tar.gz | docker load
-cd /path/to/kiro-proxy && docker compose up -d
 rm /tmp/kiro-proxy.tar.gz
 ```
 
-服务器上仍需要有本仓库的 `docker-compose.yml` 和 `data/` 目录，但不需要完整源码。
+导入后要让 compose 用这个本地镜像，而不是去仓库拉取——把服务器上 `docker-compose.yml` 的 `image` 改成导入时的标签：
+
+```yaml
+services:
+  kiro2cc-proxy:
+    image: kiro-proxy:latest # 原为 kch9231/kiro-proxy:latest
+```
+
+然后启动（不要加 `--build`，也不要叠加 `docker-compose.build.yml`）：
+
+```bash
+cd /path/to/kiro-proxy && docker compose up -d
+```
+
+服务器上仍需要有本仓库的 `docker-compose.yml` 和 `data/` 目录，但不需要完整源码。后续更新重复「本机构建 → 传输 → `docker load` → `docker compose up -d`」即可。
 
 > ⚠️ **注意 CPU 架构**：本机与服务器架构不一致时（例如本机是 Apple Silicon arm64、服务器是 x86_64），必须指定目标平台构建，否则镜像在服务器上无法运行：
 >
@@ -326,16 +388,25 @@ rm /tmp/kiro-proxy.tar.gz
 
 ### 发布到镜像仓库（可选）
 
-管理多台服务器时，可以构建一次推到自己的仓库，各服务器直接拉取，省去重复编译：
+管理多台服务器时，可以构建一次推到自己的仓库，各服务器直接拉取，省去重复编译。
+
+**推送时必须指定目标平台**，否则推上去的是构建机自己的架构（Mac 上就是 arm64），x86_64 服务器拉下来无法启动：
 
 ```bash
-# 本机
 docker login
-docker build -t your-username/kiro-proxy:latest .
-docker push your-username/kiro-proxy:latest
+
+# 只部署到 x86_64 服务器
+docker buildx build --platform linux/amd64 \
+  -t your-username/kiro-proxy:latest --push .
+
+# 或一次推送多架构镜像，服务器拉取时自动选择匹配的那个
+docker buildx build --platform linux/amd64,linux/arm64 \
+  -t your-username/kiro-proxy:latest --push .
 ```
 
-然后把服务器上 `docker-compose.yml` 的 `build: .` 删掉，`image` 改为 `your-username/kiro-proxy:latest`，之后用 `docker compose pull && docker compose up -d` 更新。
+然后把服务器上 `docker-compose.yml` 的 `image` 改为 `your-username/kiro-proxy:latest`，按方式 A 部署即可（不要叠加 `docker-compose.build.yml`），之后用 `docker compose pull && docker compose up -d` 更新。
+
+> 💡 `buildx build --push` 会直接推送，不会在本地留下镜像；想同时保留本地副本可加 `--load`（仅限单平台）。
 
 ---
 
@@ -372,7 +443,14 @@ extra_hosts:
 
 在管理面板「添加账号 / 编辑账号」中填写 **Profile ARN**，格式如：`arn:aws:codewhisperer:<region>:<account-id>:profile/<profile-id>`
 
-**Q：构建过程中被中断，日志出现 `signal: 9` 或 `Killed`**
+**Q：拉取镜像失败（方式 A）**
+
+从 Docker Hub 拉取失败时可以：
+
+1. 为 Docker 配置镜像加速器
+2. 或改用方式 B 从源码构建（见「快速开始 → 选择部署方式」）
+
+**Q：构建过程中被中断，日志出现 `signal: 9` 或 `Killed`（方式 B）**
 
 内存不足被系统 OOM Kill，Rust 编译阶段最容易触发。可选方案：
 
@@ -382,8 +460,9 @@ extra_hosts:
    sudo mkswap /swapfile && sudo swapon /swapfile
    ```
 2. 改为在本机构建后传输镜像，见「构建说明 → 低配服务器：本地构建后传输」
+3. 或直接改用方式 A 拉取预构建镜像
 
-**Q：构建时拉取基础镜像或依赖失败**
+**Q：构建时拉取基础镜像或依赖失败（方式 B）**
 
 构建需要访问 Docker Hub、npm 和 crates.io。国内网络可以：
 
@@ -392,10 +471,12 @@ extra_hosts:
 
 **Q：改了代码，重启后没生效**
 
-`docker compose up -d` 发现本地已有 `kiro-proxy:latest` 就会直接复用，不会重新构建。必须显式加 `--build`：
+先确认用的是方式 B——方式 A 拉的是预构建镜像，本地代码改动不会进入镜像。
+
+方式 B 下，`docker compose up -d` 发现本地已有 `kiro-proxy:latest` 就会直接复用，不会重新构建。必须显式加 `--build`：
 
 ```bash
-docker compose up -d --build
+docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
 ```
 
 前端代码同样如此——前端产物是编译进 Rust 二进制的，改动前端也要重新构建整个镜像。

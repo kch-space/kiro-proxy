@@ -1,0 +1,12 @@
+# 源码构建覆盖文件
+# 与 docker-compose.yml 叠加使用，把镜像来源从「拉取预构建镜像」换成「从本地源码构建」。
+#
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+#
+# 嫌命令太长可以在项目根目录创建 .env 写入下面一行，之后直接用 docker compose up -d --build：
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.build.yml
+
+services:
+  kiro2cc-proxy:
+    build: .
+    image: kiro-proxy:latest

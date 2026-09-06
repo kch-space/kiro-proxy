@@ -33,13 +33,17 @@ Anthropic Claude API 兼容代理服务，将 Claude API 请求转发到 Kiro。
 
 | | 方式 A：拉取预构建镜像 | 方式 B：从源码构建 |
 |---|---|---|
+| 操作 | 一步：`up -d` | 两步：先 `build` 再 `up -d` |
 | 耗时 | 10-60 秒 | 7-15 分钟 |
 | 额外要求 | 无 | Git、内存 ≥ 2GB、可用磁盘 ≥ 10GB |
 | 能否用自己改的代码 | 不能 | 能 |
 | 架构适配 | 由镜像仓库自动匹配 | 构建机即运行机，天然一致 |
+| 构建产物 | 无 | 本地镜像 `kiro-proxy:latest`，可推到自己的仓库复用 |
 | 适合 | 开箱即用、快速上线 | 改过代码、或想自己掌控构建产物 |
 
 > 💡 拿不定就先用**方式 A**，之后想改代码再切到方式 B，两者可以随时互换，数据不受影响。
+>
+> 💡 **多台服务器**：用方式 B 在一台机器上构建好，把镜像推到自己的镜像仓库，其余机器改用方式 A 拉取即可，不必每台都编译一遍。见「构建说明 → 发布到镜像仓库」。
 >
 > ⚠️ **注意**：方式 B 的构建对内存要求较高，Rust 编译阶段在 1GB 内存的小规格服务器上可能被 OOM Kill。这种情况可以在本机构建好镜像再传到服务器，见「构建说明 → 低配服务器：本地构建后传输」。
 
@@ -95,19 +99,33 @@ docker compose up -d
 
 **方式 B：从源码构建**
 
-叠加 `docker-compose.build.yml`，把镜像来源换成本地源码：
+分两步：**先构建镜像，再用构建好的镜像启动**。叠加 `docker-compose.build.yml` 即可把镜像来源换成本地源码。
+
+第一步，构建镜像：
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+docker compose -f docker-compose.yml -f docker-compose.build.yml build
 ```
 
-> 💡 嫌命令太长，可以在项目根目录创建 `.env` 写入一行，之后直接用 `docker compose up -d --build` 即可：
+首次构建需要 7-15 分钟（前端编译 2-4 分钟 + Rust 编译 5-10 分钟），产物是本地镜像 `kiro-proxy:latest`。
+
+第二步，启动服务：
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.build.yml up -d
+```
+
+这一步只需几秒，直接使用上一步构建好的镜像，不会重新编译。
+
+> 💡 嫌命令太长，可以在项目根目录创建 `.env` 写入一行，之后 `docker compose build` / `docker compose up -d` 就够了：
 >
 > ```bash
 > echo "COMPOSE_FILE=docker-compose.yml:docker-compose.build.yml" > .env
 > ```
 >
-> 首次构建需要 7-15 分钟（前端编译 2-4 分钟 + Rust 编译 5-10 分钟），产物会缓存为本地镜像 `kiro-proxy:latest`。后续启动直接复用，只有显式加 `--build` 才会重新构建。
+> 后续改了代码，重复这两步即可（构建有缓存，通常比首次快很多）。
+
+> 💡 构建产物是一个独立的本地镜像，可以打 tag 推到自己的镜像仓库，之后这台机器和其他机器都能改用方式 A 直接拉取，不必每台都编译一遍。见「构建说明 → 发布到镜像仓库」。
 
 **5. 访问管理面板**
 
@@ -269,15 +287,16 @@ docker compose up -d     # 用新镜像重建容器
 ```bash
 cd /path/to/kiro-proxy
 git pull
-docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+docker compose -f docker-compose.yml -f docker-compose.build.yml build   # 重新构建镜像
+docker compose -f docker-compose.yml -f docker-compose.build.yml up -d   # 用新镜像重建容器
 ```
 
-（若已在 `.env` 中配置 `COMPOSE_FILE`，直接 `docker compose up -d --build` 即可。）
+（若已在 `.env` 中配置 `COMPOSE_FILE`，直接 `docker compose build && docker compose up -d` 即可。）
 
 要点：
 
-- **必须加 `--build`**。不加的话 compose 发现本地已有 `kiro-proxy:latest` 就直接复用，新代码不会生效
-- 构建期间**旧容器仍在提供服务**，只有构建成功后才会停旧容器、起新容器；构建失败则服务不受影响
+- **`build` 这一步不能省**。直接 `up -d` 的话，compose 发现本地已有 `kiro-proxy:latest` 就直接复用，新代码不会生效
+- 构建期间**旧容器仍在提供服务**，只有到第二步 `up -d` 才会停旧容器、起新容器；构建失败则服务完全不受影响
 - 服务器配置不足时改用本地构建再传输，见「构建说明 → 低配服务器：本地构建后传输」
 
 #### 更新后验证
@@ -301,12 +320,12 @@ docker compose logs --tail=30                              # 检查启动日志�
 docker tag kch9231/kiro-proxy:backup-20260905 kch9231/kiro-proxy:latest
 docker compose up -d
 
-# 方式 B（注意不要加 --build，否则会又从源码构建一遍）
+# 方式 B
 docker tag kiro-proxy:backup-20260905 kiro-proxy:latest
 docker compose up -d
 ```
 
-方式 B 若要回滚到某个历史版本的代码，用 `git checkout <可用的 commit>` 后重新构建。
+方式 B 若要回滚到某个历史版本的代码，用 `git checkout <可用的 commit>` 后重新执行 `build` + `up -d`。
 
 #### 清理旧镜像和构建缓存
 
@@ -319,7 +338,7 @@ docker builder prune -f    # 清理构建缓存（源码构建的缓存可达数
 
 > ⚠️ 不要用 `docker system prune -a`，它会删掉所有当前未被容器使用的镜像，包括你留作回滚的备份 tag。
 >
-> ⚠️ 清理构建缓存后，下一次 `--build` 会退化成完整重新编译（7-15 分钟）。磁盘不紧张时可以保留缓存。
+> ⚠️ 清理构建缓存后，下一次 `build` 会退化成完整重新编译（7-15 分钟）。磁盘不紧张时可以保留缓存。
 
 ### 停止服务
 
@@ -370,7 +389,7 @@ services:
     image: kiro-proxy:latest # 原为 kch9231/kiro-proxy:latest
 ```
 
-然后启动（不要加 `--build`，也不要叠加 `docker-compose.build.yml`）：
+然后启动（不要叠加 `docker-compose.build.yml`，否则会在服务器上重新编译）：
 
 ```bash
 cd /path/to/kiro-proxy && docker compose up -d
@@ -388,9 +407,23 @@ cd /path/to/kiro-proxy && docker compose up -d
 
 ### 发布到镜像仓库（可选）
 
-管理多台服务器时，可以构建一次推到自己的仓库，各服务器直接拉取，省去重复编译。
+管理多台服务器时，可以构建一次推到自己的仓库，其他机器直接按方式 A 拉取，省去每台重复编译。
 
-**推送时必须指定目标平台**，否则推上去的是构建机自己的架构（Mac 上就是 arm64），x86_64 服务器拉下来无法启动：
+**情况一：已经用方式 B 构建过，且构建机与目标服务器架构相同**
+
+方式 B 的产物就是一个完整镜像，打个 tag 直接推，不需要重新构建：
+
+```bash
+docker login
+docker tag kiro-proxy:latest your-username/kiro-proxy:latest
+docker push your-username/kiro-proxy:latest
+```
+
+例如在 x86_64 服务器上用方式 B 构建，推上去的就是 amd64 镜像，其他 x86_64 服务器可以直接拉。
+
+**情况二：构建机与目标服务器架构不同**
+
+典型场景是在 Apple Silicon 的 Mac（arm64）上构建、推给 x86_64 服务器。这时不能沿用上面的 tag + push——`docker build` 产出的是构建机自己的架构，服务器拉下来会直接报 `exec format error`。必须用 `buildx` 显式指定平台重新构建：
 
 ```bash
 docker login
@@ -404,9 +437,27 @@ docker buildx build --platform linux/amd64,linux/arm64 \
   -t your-username/kiro-proxy:latest --push .
 ```
 
-然后把服务器上 `docker-compose.yml` 的 `image` 改为 `your-username/kiro-proxy:latest`，按方式 A 部署即可（不要叠加 `docker-compose.build.yml`），之后用 `docker compose pull && docker compose up -d` 更新。
-
 > 💡 `buildx build --push` 会直接推送，不会在本地留下镜像；想同时保留本地副本可加 `--load`（仅限单平台）。
+>
+> ⚠️ 跨架构构建走 QEMU 模拟，耗时通常是原生构建的 3-5 倍。
+
+**推送后切回方式 A**
+
+把服务器上 `docker-compose.yml` 的 `image` 改为自己的镜像地址：
+
+```yaml
+services:
+  kiro2cc-proxy:
+    image: your-username/kiro-proxy:latest # 原为 kch9231/kiro-proxy:latest
+```
+
+之后这台机器按方式 A 部署和更新即可（不要再叠加 `docker-compose.build.yml`，若之前建过 `.env` 记得删掉其中的 `COMPOSE_FILE`）：
+
+```bash
+docker compose pull && docker compose up -d
+```
+
+以后代码有改动，只需在一台机器上构建并推送新镜像，其余机器执行上面这条命令就能更新。
 
 ---
 
@@ -473,10 +524,11 @@ extra_hosts:
 
 先确认用的是方式 B——方式 A 拉的是预构建镜像，本地代码改动不会进入镜像。
 
-方式 B 下，`docker compose up -d` 发现本地已有 `kiro-proxy:latest` 就会直接复用，不会重新构建。必须显式加 `--build`：
+方式 B 下，`docker compose up -d` 只会用现有的 `kiro-proxy:latest` 镜像，不会自己重新构建。必须先跑 `build`：
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+docker compose -f docker-compose.yml -f docker-compose.build.yml build
+docker compose -f docker-compose.yml -f docker-compose.build.yml up -d
 ```
 
 前端代码同样如此——前端产物是编译进 Rust 二进制的，改动前端也要重新构建整个镜像。

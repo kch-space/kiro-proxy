@@ -129,7 +129,7 @@ docker compose -f docker-compose.yml -f docker-compose.build.yml up -d
 
 **5. 访问管理面板**
 
-打开浏览器访问 `http://localhost:5678/admin`，使用 `config.json` 中配置的 `adminApiKey` 登录，然后添加 Kiro 账号。
+打开浏览器访问 `http://localhost:5678/admin`，使用 `config.json` 中配置的 `adminApiKey` 登录，然后通过「批量导入」或「Kiro Account Manager 导入」添加 Kiro 账号（见「配置说明 → 添加账号」）。
 
 ---
 
@@ -173,8 +173,12 @@ docker compose -f docker-compose.yml -f docker-compose.build.yml up -d
 
 1. 访问 `http://localhost:5678/admin`
 2. 使用 `adminApiKey` 登录
-3. 点击「添加账号」按钮
-4. 填入账号信息并保存
+3. 按账号来源选择导入入口：
+   - **Kiro Account Manager 导入**：来自 KAM 或本项目「导出账号」的 JSON，可直接粘贴或把 `.json` 文件拖进对话框，导入前会显示识别到的账号数量
+   - **批量导入**：自己整理的 JSON，格式较宽松（账号数组、`{ "accounts": [...] }`、单个对象都支持），单个账号也从这里粘贴
+4. 点击「开始导入并验活」
+
+两个入口都会逐个查重、添加并验活，验活失败的账号会自动回滚删除，导入过程有进度和逐条结果。
 
 **方式二：手动编辑配置文件**
 
@@ -492,7 +496,7 @@ extra_hosts:
 
 **Q：企业版 IdC 账号请求返回 502**
 
-在管理面板「添加账号 / 编辑账号」中填写 **Profile ARN**，格式如：`arn:aws:codewhisperer:<region>:<account-id>:profile/<profile-id>`
+在管理面板的「编辑账号」中填写 **Profile ARN**，格式如：`arn:aws:codewhisperer:<region>:<account-id>:profile/<profile-id>`；批量导入时也可以在 JSON 里带上 `profileArn` 字段。
 
 **Q：拉取镜像失败（方式 A）**
 

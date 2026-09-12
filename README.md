@@ -350,6 +350,70 @@ docker builder prune -f    # 清理构建缓存（源码构建的缓存可达数
 docker compose down
 ```
 
+### 同服务器内部调用（网络配置）
+
+如果同服务器上的其他 Docker 容器需要调用本服务，可以将它们加入同一个 Docker 网络。
+
+**方法一：将本服务加入其他服务的网络（推荐）**
+
+如果其他服务已经在运行，直接将 kiro-proxy 加入它的网络：
+
+```bash
+# 查看其他服务的网络名称
+docker network ls
+
+# 将 kiro-proxy 加入该网络（例如 cliproxyapi_default）
+docker network connect cliproxyapi_default kiro2cc-proxy
+```
+
+加入后，该网络下的其他容器就可以直接通过容器名访问：
+
+```bash
+# 在其他容器中
+curl http://kiro2cc-proxy:5678/v1/messages
+```
+
+或在配置中使用：
+
+```yaml
+# 其他服务的配置
+environment:
+  - CLAUDE_API_URL=http://kiro2cc-proxy:5678
+```
+
+> 💡 这种方式无需修改 `docker-compose.yml`，适合已部署的服务。
+
+**方法二：通过 docker-compose.yml 配置网络**
+
+如果需要在部署时就配置好网络，可以修改 `docker-compose.yml`：
+
+```yaml
+services:
+  kiro2cc-proxy:
+    image: kch9231/kiro-proxy:latest
+    container_name: kiro2cc-proxy
+    ports:
+      - "0.0.0.0:5678:5678"
+    volumes:
+      - ./data:/app/config
+    restart: unless-stopped
+    networks:
+      - default
+      - other-network  # 加入其他服务的网络
+
+networks:
+  other-network:
+    external: true
+    name: cliproxyapi_default  # 其他服务的网络名称
+```
+
+然后重启：
+
+```bash
+docker compose up -d
+```
+
+
 ---
 
 ## 构建说明
